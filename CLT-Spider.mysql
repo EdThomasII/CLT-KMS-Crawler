@@ -1,0 +1,683 @@
+################################################################################
+#     file: CLT-Spider-Revised.mysql
+#   author: Ed Thomas
+# modified: 12-October-2017
+#  purpose: Preliminary/test-bed design of the mysql tables needed to store and
+#           maintain the CLT Knowledge Base (CLT_KB) system. Running this script
+#           will erase any existing data stored in the CLT_KB. Thus, run this
+#           script only when initializing the database, or after a significant
+#           re-design of the knowledge base.
+#
+#
+#    Note: The status fields in the InformationLink
+#          table indicate the status or degree of completeness of that entry in
+#          the database. The potential values and meanings of the status variable
+#          are:
+#                        0 :: Explored, no Keywords
+#                       10 :: Explored, has one or more keywords
+#                       20 :: Unexplored, parent has keywords
+#                 	30 :: Unexplored
+#                       35 :: Profile incomplete (Organization and Contact tables only)
+#                       40 :: Access disallowed in robots.txt
+#                       50 :: Error condition/ web timeout
+#
+#   The InformationLinkCategory table lists popular/informative
+#   categories that can be associated with data. This is not a fixed list and should be
+#   expanded or shortened to suit the needs of the database and its users.
+#
+################################################################################
+
+DROP DATABASE if exists CLT_KB;
+
+CREATE DATABASE CLT_KB;
+
+USE CLT_KB;
+
+create table InformationLink(
+       linkID			int,
+       linkURL          	varchar(512),
+       linkTitle        	varchar(256),
+       linkSynopsis		varchar(1024),
+       referrerID		int,
+       downloadPath		varchar(1024),
+       discovered		date,
+       lastExplored		date,
+       keywordCount		int,
+       status                   int,
+       level			int,
+       category			int,
+       
+       primary key (linkID),
+       index (linkID),
+       index (linkURL)
+);
+
+
+create table TrackLinkID (
+       linkID		int
+);
+
+insert into TrackLinkID values(100);
+
+
+
+create table KeywordLinkage(
+       linkID		int NOT NULL,
+       keywordID	int NOT NULL,
+
+       primary key (linkID, keywordID)
+);
+
+
+CREATE TABLE categories (
+       category_id	 int(11) NOT NULL AUTO_INCREMENT,
+       category_name	  varchar(50) NOT NULL,
+       
+       PRIMARY KEY (category_id),
+       UNIQUE KEY category_name (category_name)
+);
+
+
+
+insert into categories VALUES (1,  'ALTERNATE CONFIGURATIONS');
+insert into categories VALUES (2,  'BUILDING CODE');
+insert into categories VALUES (3,  'BUILDING PROJECTS');
+insert into categories VALUES (4,  'DURABILITY');
+insert into categories VALUES (5,  'ECONOMIC');
+insert into categories VALUES (6,  'ENVIRONMENTAL');
+insert into categories VALUES (7,  'FIRE PERFORMANCE');
+insert into categories VALUES (8,  'MANUFACTURERS');
+insert into categories VALUES (9,  'MANUFACTURING');
+insert into categories VALUES (10, 'MARKET');
+insert into categories VALUES (11, 'MECHANICAL');
+insert into categories VALUES (12, 'MOISURE PERFORMANCE');
+insert into categories VALUES (13, 'RAW MATERIAL');
+insert into categories VALUES (14, 'SEISMIC');
+insert into categories VALUES (15, 'STANDARDS');
+insert into categories VALUES (16, 'STRUCTURAL PERFORMANCE');
+insert into categories VALUES (17, 'TALL BUILDINGS');
+insert into categories VALUES (18, 'VIBRATION');
+
+
+
+CREATE TABLE type (
+       TYPE_ID 	  int(11) NOT NULL AUTO_INCREMENT,
+       TYPE_NAME  varchar(50) NOT NULL,
+       PRIMARY KEY (TYPE_ID)
+);
+
+INSERT INTO type VALUES (1,'RESEARCH PAPER');
+INSERT INTO type VALUES (2,'JOURNAL');
+INSERT INTO type VALUES (3,'NEWSPAPER ARTICLE');
+INSERT INTO type VALUES (4,'TEST');
+
+
+create table Keywords (
+       keyword		varchar(40) NOT NULL,
+       keywordID	int NOT NULL,
+      
+       primary key (keywordID)
+);
+
+
+################################################################################
+##
+##  Search keywords are divided into distinct groups corresponding to different
+##  potential search areas that could be conducted on CLT's. The first keyword
+##  set, 100 series, are CLT specific keywords that must be found for a site to
+##  be indexed. If none of these keywords are found on a site, then no search 
+##  is made for the other keywords.
+##
+##  Omar, you have a better idea about the keyword groupings than me.  You may
+##  want to regroup them into different areas, or do away with the grouping
+##  approach altogether.
+##
+#################################################################################
+##
+##			100 Series Keywords
+##
+################################################################################
+insert into Keywords values('CLT',			100);
+insert into Keywords values('CROSS-LAM',		102);
+insert into Keywords values('CROSS-LAMINATED-PANELS',	104);
+insert into Keywords values('CROSS-LAMINATED PANELS',	106);
+insert into Keywords values('CROSS LAMINATED PANELS',	108);
+insert into Keywords values('CROSS-LAMINATED-TIMBER',	110);
+insert into Keywords values('CROSS-LAMINATED TIMBER',	112);
+insert into Keywords values('CROSS LAMINATED TIMBER',	114);
+insert into Keywords values('DOWEL-LAMINATED-TIMBER',   115);
+insert into Keywords values('DLT',                      116);
+##insert into Keywords values('GLT', 	     		117); ## Removed glulam keywords 11-Oct-2017
+##insert into Keywords values('GLUED-LAMINATED-TIMBER',	118);
+##insert into Keywords values('GLUED-LAMINATED TIMBER',	120);
+##insert into Keywords values('GLUED LAMINATED TIMBER',	122);
+insert into Keywords values('HEAVY TIMBER',  		124);
+insert into Keywords values('HEAVY-TIMBER',		126);
+insert into Keywords values('KREUZ LAGEN HOLZ',		128);
+insert into Keywords values('KLH',			129);
+insert into Keywords values('MASS-TIMBER',		130);
+insert into Keywords values('MASS TIMBER',		132);
+insert into Keywords values('MASSIVE TIMBER',		134);
+insert into Keywords values('NLT',   			136);
+insert into Keywords values('NAILED-LAMINATED-TIMBER',	138);
+insert into Keywords values('NAILED-LAMINATED TIMBER',	140);
+insert into Keywords values('NAILED LAMINATED TIMBER',	142);
+insert into Keywords values('WCC',  	      		144);
+insert into Keywords values('WOOD CONCRETE COMPOSITE',	146);
+insert into Keywords values('X-LAM',	   		148);
+insert into Keywords values('XLAM',	   		149);
+
+
+#################################################################################
+##
+##		200 Series Keywords -- Design Elements/Criteria
+##
+################################################################################
+insert into Keywords values('ACOUSTIC',			200);
+insert into Keywords values('CONNECTION',		205);
+insert into Keywords values('CONNECTORS',		210);
+insert into Keywords values('CREEP',			215);
+insert into Keywords values('DEFLECTION',		220);
+insert into Keywords values('DENSITY',			225);
+insert into Keywords values('DIMENSIONS',		230);
+insert into Keywords values('LATERAL LOAD',		234);
+insert into Keywords values('LOAD',  			238);
+insert into Keywords values('MODULUS',			242);
+insert into Keywords values('PROPERTIES',		244);
+insert into Keywords values('RESEARCH',			248);
+insert into Keywords values('SEISMIC',			252);
+insert into Keywords values('SHEAR',			256);
+insert into Keywords values('SPAN',			260);
+insert into Keywords values('SPECIFICATION',		264);
+insert into Keywords values('STIFFNESS',		268);
+insert into Keywords values('STRENGTH',			272);
+insert into Keywords values('STRUCTURAL',		276);
+insert into Keywords values('STRUCTURAL PERFORMANCE',	280);
+insert into Keywords values('THERMAL',			282);
+
+
+#################################################################################
+##
+##		300 Series Keywords -- Manufacture
+##
+################################################################################
+insert into Keywords values('COST',			310);
+insert into Keywords values('GLUE',			320);
+insert into Keywords values('LAMINATIONS',		330);
+insert into Keywords values('MANUFACTURER',		340);
+insert into Keywords values('RESIN',			350);
+insert into Keywords values('THICKNESS',		360);
+
+
+#################################################################################
+##
+##		400 Series Keywords -- Construction
+##
+################################################################################
+insert into Keywords values('ARCHITECT',		  400);
+insert into Keywords values('BIM',			  405);
+insert into Keywords values('BLUE PRINT',		  410);
+insert into Keywords values('BUILDER',			  415);
+insert into Keywords values('BUILDING CODE',		  420);
+insert into Keywords values('BUILDING INFORMATION MODEL', 425);
+insert into Keywords values('BUILDING PERMIT',	  	  430);
+insert into Keywords values('BUILDING SYSTEM',		  435);
+insert into Keywords values('CONTRACTOR',		  440);
+insert into Keywords values('CONSTRUCTION',		  445);
+insert into Keywords values('DESIGN',			  450);
+insert into Keywords values('INSTALLATION',		  455);
+insert into Keywords values('MECHANICAL SYSTEM',	  460);
+insert into Keywords values('PROJECTS',			  465);
+
+
+#################################################################################
+##
+##		500 Series Keywords -- Environment/Conservation
+##
+################################################################################
+insert into Keywords values('GREEN CONSTRUCTION',	520);
+insert into Keywords values('LOW-VALUED',		530);
+insert into Keywords values('RESOURCE USE',		540);
+insert into Keywords values('SMALL DIAMETER',		550);
+insert into Keywords values('SUSTAINABILITY',		560);
+
+
+#################################################################################
+##
+##		600 Series Keywords -- Habitability / Safety
+##
+################################################################################
+insert into Keywords values('ATMOSPHERE',		600);
+insert into Keywords values('COURT',			605);
+insert into Keywords values('DURABILITY',		610);
+insert into Keywords values('FIRE',			615);
+insert into Keywords values('LEGAL',			620);
+insert into Keywords values('MAINTENANCE',		625);
+insert into Keywords values('MOISTURE',			630);
+insert into Keywords values('NOISE',			635);
+insert into Keywords values('SUIT',			660);
+insert into Keywords values('SOUND PROOFING',		665);
+insert into Keywords values('VIBRATION',		680);
+
+
+#################################################################################
+##
+##		700 Series Keywords -- Market Acceptance
+##
+################################################################################
+insert into Keywords values('ADOPTION',			700);
+insert into Keywords values('COST COMPARISON',		720);
+insert into Keywords values('INNOVATION',		735);
+insert into Keywords values('MARKETING',		750);
+
+
+#################################################################################
+##
+##		800 Series Keywords -- Completed Structures
+##
+################################################################################
+insert into Keywords values('BUILDINGS',		810);
+insert into Keywords values('COMPLETED',		820);
+insert into Keywords values('FINISHED',			830);
+insert into Keywords values('HIGH-RISE',		840);
+insert into Keywords values('HOMES',			845);
+
+
+#################################################################################
+##
+##		9000 Series Keywords -- Tree Species
+##
+################################################################################
+insert into Keywords values ('ALDER',	             9000);
+insert into Keywords values ('ASH',	             9001);
+insert into Keywords values ('ASPEN',	             9002);
+insert into Keywords values ('BALSA',	             9003);
+insert into Keywords values ('BASSWOOD',             9004);
+insert into Keywords values ('BEECH',                9005);
+insert into Keywords values ('BIRCH',                9006);
+insert into Keywords values ('YELLOW BIRCH',	     9040);  
+insert into Keywords values ('PAPER BIRCH',	     9041);  
+insert into Keywords values ('BLACK BIRCH',	     9042);  
+insert into Keywords values ('BUCKEYE',              9007);
+insert into Keywords values ('BUTTERNUT',            9008);
+insert into Keywords values ('CHERRY',               9009);
+insert into Keywords values ('COTTONWOOD',           9010);
+insert into Keywords values ('CHESTNUT',             9011);
+insert into Keywords values ('ELM',                  9012);
+insert into Keywords values ('HACKBERRY',            9013);
+insert into Keywords values ('HACKMATACK',           9043); 
+insert into Keywords values ('HICKORY',              9014);
+insert into Keywords values ('GUM',                  9015);
+insert into Keywords values ('LOCUST',               9016);
+insert into Keywords values ('MAPLE',                9017);
+insert into Keywords values ('RED MAPLE',	     9034);  
+insert into Keywords values ('SOFT MAPLE',	     9035);  
+insert into Keywords values ('HARD MAPLE',	     9036);  
+insert into Keywords values ('SILVER MAPLE',	     9037);  
+insert into Keywords values ('STRIPED MAPLE',	     9038);  
+insert into Keywords values ('SUGAR MAPLE',	     9039);  
+insert into Keywords values ('NON-CONIFEROUS',       9018);
+insert into Keywords values ('OAK',                  9019);
+insert into Keywords values ('OAK RED',              9020);
+insert into Keywords values ('OAK NORTHERN RED',     9021);
+insert into Keywords values ('OAK SOUTHERN RED',     9022);
+insert into Keywords values ('OAK WHITE',            9023);
+insert into Keywords values ('OAK CHESTNUT',         9024);
+insert into Keywords values ('PECAN',                9025);
+insert into Keywords values ('POPLAR',               9026);
+insert into Keywords values ('POPLAR BALSAM',        9027);
+insert into Keywords values ('POPLAR YELLOW',        9028);
+insert into Keywords values ('TUPELO',               9029);
+insert into Keywords values ('WALNUT',               9030);
+insert into Keywords values ('WILLOW',               9031);
+insert into Keywords values ('MAGNOLIA',             9032);
+insert into Keywords values ('CUCUMBER',             9033);
+
+# Softwoods
+insert into Keywords values ('CEDAR',                9101);
+insert into Keywords values ('CYPRESS',              9102);
+insert into Keywords values ('CONIFEROUS',           9103);
+insert into Keywords values ('DOUGLAS FIR',          9104);
+insert into Keywords values ('FIR',                  9140);  
+insert into Keywords values ('SILVER FIR',	     9141);  
+insert into Keywords values ('BALSAM FIR',	     9142);  
+insert into Keywords values ('FRASIER FIR',	     9143);  
+insert into Keywords values ('HEMLOCK',              9105);
+insert into Keywords values ('JUNIPER',              9106);
+insert into Keywords values ('LARCH',                9107);
+insert into Keywords values ('PINE',                 9108);
+insert into Keywords values ('PINE JACK',            9109);
+insert into Keywords values ('PINE LODGEPOLE',       9110);
+insert into Keywords values ('PINE MONTEREY',        9111);
+insert into Keywords values ('PINE PONDEROSA',       9112);
+insert into Keywords values ('PINE RADIATA',         9139);  
+insert into Keywords values ('PINE RED',             9113);
+insert into Keywords values ('PINE SCOTS',           9114);
+insert into Keywords values ('PINE SUGAR',           9115);
+insert into Keywords values ('PINE WHITE',           9116);
+insert into Keywords values ('PINE EASTERN WHITE',   9117);
+insert into Keywords values ('PINE WESTERN WHITE',   9118);
+insert into Keywords values ('PINE SOUTHERN YELLOW', 9119);
+insert into Keywords values ('PINE LOBLOLLY',        9120);
+insert into Keywords values ('PINE LONGLEAF',        9121);
+insert into Keywords values ('PINE PITCH',           9122);
+insert into Keywords values ('PINE SHORTLEAF',       9123);
+insert into Keywords values ('SPRUCE-PINE-FIR',      9124);
+insert into Keywords values ('SPRUCE',               9125);
+insert into Keywords values ('SPRUCE BLACK ',        9126);
+insert into Keywords values ('SPRUCE NORWAY',        9127);
+insert into Keywords values ('SPRUCE RED ',          9128);
+insert into Keywords values ('SPRUCE SITKA ',        9129);
+insert into Keywords values ('SPRUCE WHITE',         9130);
+insert into Keywords values ('REDCEDAR',             9131);
+insert into Keywords values ('EASTERN REDCEDAR',     9132);
+insert into Keywords values ('WESTERN REDCEDAR',     9133);
+insert into Keywords values ('REDWOOD',              9134);
+insert into Keywords values ('TAMARACK',             9135);
+insert into Keywords values ('WHITECEDAR',           9136);
+insert into Keywords values ('WHITECEDAR NORTHERN',  9137);
+insert into Keywords values ('WHITECEDAR ATLANTIC',  9138);
+
+
+#Tropical
+insert into Keywords values ('ABACHI',               9201);
+insert into Keywords values ('ARUACARIA',            9202);
+insert into Keywords values ('BALSA',                9203);
+insert into Keywords values ('BUBINGA',              9204);
+insert into Keywords values ('CORKWOOD',             9205);
+insert into Keywords values ('EBONY',                9206);
+insert into Keywords values ('EUCALYPTUS',           9207);
+insert into Keywords values ('GREENHEART',           9208);
+insert into Keywords values ('LYPTUS',               9209);
+insert into Keywords values ('JARRAH',               9210);
+insert into Keywords values ('KAURI',                9211);
+insert into Keywords values ('KARRI',                9212);
+insert into Keywords values ('MAHOGANY',             9213);
+insert into Keywords values ('MAHOGANY, AFRICAN',    9214);
+insert into Keywords values ('MAHOGANY, BIGLEAF',    9215);
+insert into Keywords values ('MERANTI',              9216);
+insert into Keywords values ('MERBAU',               9217);
+insert into Keywords values ('OKOUME',               9218);
+insert into Keywords values ('PADAUK',               9219);
+insert into Keywords values ('PURPLEHEART',          9220);
+insert into Keywords values ('REDHEART',             9221);
+insert into Keywords values ('ROSEWOOD',             9222);
+insert into Keywords values ('SANDALWOOD',           9223);
+insert into Keywords values ('SAPELE',               9225);
+insert into Keywords values ('SPANISH-CEDAR',        9226);
+insert into Keywords values ('TEAK',                 9227);
+insert into Keywords values ('WENGE',                9228);
+insert into Keywords values ('MAHOGANY, HONDURAS',   9229);
+
+
+#Alternate Species Names
+insert into Keywords values ('YELLOW PINE',          9300);
+insert into Keywords values ('YELLOW POPLAR',        9301);
+insert into Keywords values ('AFRICAN MAHOGANY',     9302);
+insert into Keywords values ('BIGLEAF MAHOGANY',     9303);
+insert into Keywords values ('BALSAM POPLAR',        9304);
+insert into Keywords values ('YELLOW POPLAR',        9305);
+insert into Keywords values ('TULIP POPLAR',         9306);
+insert into Keywords values ('SPANISH CEDAR',        9307);
+insert into Keywords values ('RED OAK',              9308);
+insert into Keywords values ('NORTHERN RED OAK',     9309);
+insert into Keywords values ('SOUTHERN RED OAK',     9310);
+insert into Keywords values ('WHITE OAK',            9311);
+insert into Keywords values ('CHESTNUT OAK',         9312);
+insert into Keywords values ('EASTERN REDCEDAR',     9313);
+insert into Keywords values ('WESTERN REDCEDAR',     9314);
+insert into Keywords values ('JACK PINE',            9315);
+insert into Keywords values ('LODGEPOLE PINE',       9316);
+insert into Keywords values ('MONTEREY PINE',        9317);
+insert into Keywords values ('PONDEROSA PINE',       9318);
+insert into Keywords values ('RED PINE',             9319);
+insert into Keywords values ('SCOTS PINE',           9320);
+insert into Keywords values ('SUGAR PINE',           9321);
+insert into Keywords values ('WHITE PINE',           9322);
+insert into Keywords values ('EASTERN WHITE PINE',   9323);
+insert into Keywords values ('WESTERN WHITE PINE',   9324);
+insert into Keywords values ('SOUTHERN YELLOW PINE', 9325);
+insert into Keywords values ('LOBLOLLY PINE',        9326);
+insert into Keywords values ('LONGLEAF PINE',        9327);
+insert into Keywords values ('PITCH PINE',           9328);
+insert into Keywords values ('SHORTLEAF PINE',       9329);
+insert into Keywords values ('NORTHERN WHITECEDAR',  9330);
+insert into Keywords values ('ATLANTIC WHITECEDAR',  9331);
+insert into Keywords values ('BLACK SPRUCE',         9332);
+insert into Keywords values ('NORWAY SPRUCE',        9333);
+insert into Keywords values ('RED SPRUCE',           9334);
+insert into Keywords values ('SITKA SPRUCE',         9335);
+insert into Keywords values ('WHITE SPRUCE',         9336);
+insert into Keywords values ('SPF',                  9337);
+insert into Keywords values ('YELLOW-PINE',          9338);
+insert into Keywords values ('RADIATA',              9339); 
+insert into Keywords values ('EASTERN REDCEDAR',     9340);
+insert into Keywords values ('EASTERN RED CEDAR',    9341);
+insert into Keywords values ('WESTERN REDCEDAR',     9342);
+insert into Keywords values ('WESTERN RED CEDAR',    9343);
+insert into Keywords values ('BIRCH YELLOW',         9344);
+insert into Keywords values ('BIRCH PAPER',          9345);
+insert into Keywords values ('BIRCH BLACK',          9346);
+insert into Keywords values ('WHITE WALNUT',         9347);
+insert into Keywords values ('WALNUT WHITE',         9348);
+insert into Keywords values ('MAPLE HARD',           9349);
+insert into Keywords values ('MAPLE RED',            9350);
+insert into Keywords values ('MAPLE SILVER',         9351);
+insert into Keywords values ('MAPLE SOFT',           9352);
+insert into Keywords values ('MAPLE STRIPED',        9353);
+insert into Keywords values ('MAPLE SUGAR',          9354);
+insert into Keywords values ('BLACK WALNUT',         9355);
+insert into Keywords values ('WALNUT BLACK',         9356);
+
+
+################################################################################
+##
+## The following tables and data inserts define a set of keywords and sites
+## should be ignored/avoided when crawling the web.  Note, that whenever a site
+## has been found to contain one of the ExcludeKeywords, any results from the
+## site should be ignored and the site not indexed/stored in the database.
+##
+## ExcludedSites lists sites that contain many keywords related to CLT, but
+## little or no content. These sites were discovered and listed during
+## development of the market spider. Note, porn site hits should be
+## controlled using content filtering with the firewall software. 
+##
+## Omar, depending on the scope and your desire to index current society and
+## and CLT's, you may want to remove media and social media web pages from
+## the ExcludedSites table.  
+##
+################################################################################
+
+create table ExcludeKeywords (
+  Keyword    varchar(30),
+  KeyID      SMALLINT PRIMARY KEY
+);
+
+
+create table ExcludedSites(
+  MainURL    varchar(128),
+  URL_ID     SMALLINT PRIMARY KEY
+);
+       
+
+#
+#  Medical Keywords
+#
+#insert into ExcludeKeywords values ('MEDICINE',			100);
+insert into ExcludeKeywords values ('VIAGRA',      		101);
+insert into ExcludeKeywords values ('PHARMACY',    		102);
+#insert into ExcludeKeywords values ('MEDICAL',     		103);
+insert into ExcludeKeywords values ('PAIN KILLER', 		104);
+insert into ExcludeKeywords values ('PAIN CLINIC', 		105);
+#insert into ExcludeKeywords values ('HOSPITAL',    		106);
+insert into ExcludeKeywords values ('STERIOD',     		107);
+insert into ExcludeKeywords values ('HORMONE',     		108);
+insert into ExcludeKeywords values ('ALL NATURAL', 		109);
+insert into ExcludeKeywords values ('RX ',        		110);
+insert into ExcludeKeywords values ('PAIN MEDS',   		111);
+insert into ExcludeKeywords values ('DIET',        		112);
+insert into ExcludeKeywords values ('LOSE WEIGHT', 		113);
+
+
+#
+# Scenic and Tourist Attraction keywords
+#
+insert into ExcludeKeywords values ('PARKS',                  300);
+insert into ExcludeKeywords values ('HISTORIC SITE',          301);
+insert into ExcludeKeywords values ('TOURISM',                302);
+insert into ExcludeKeywords values ('MUSEUM',                 303);
+insert into ExcludeKeywords values ('FESTIVAL',               304);
+
+
+#
+# Generic and Scam Keywords
+#
+#insert into ExcludeKeywords values ('AMAZING',                200);
+insert into ExcludeKeywords values ('APPLY ONLINE',           201);
+insert into ExcludeKeywords values ('AS SEEN ON TV',          202);
+insert into ExcludeKeywords values ('BANKRUPTCY',             203);
+insert into ExcludeKeywords values ('DVD',                    204);
+insert into ExcludeKeywords values ('CONGRATULATIONS',        205);
+insert into ExcludeKeywords values ('DEBT',                   206);
+insert into ExcludeKeywords values ('CREDIT CHECK',           207);
+insert into ExcludeKeywords values ('CREDIT BUREAU',          208);
+insert into ExcludeKeywords values ('BALDNESS',               209);
+insert into ExcludeKeywords values ('CREDITORS',              210);
+insert into ExcludeKeywords values ('CASINO',                 211);
+insert into ExcludeKeywords values ('EASY TERMS',             212);
+insert into ExcludeKeywords values ('RISK FREE',              213);
+insert into ExcludeKeywords values ('INTEREST RATE',          214);
+insert into ExcludeKeywords values ('CALL NOW',               215);
+insert into ExcludeKeywords values ('DRASTICALLY REDUCED',    216);      
+insert into ExcludeKeywords values ('CANCEL AT ANY TIME',     217);       
+insert into ExcludeKeywords values ('REVERSE AGING',          218);
+insert into ExcludeKeywords values ('REMOVE WRINKLES',        219);
+insert into ExcludeKeywords values ('ERASE WRINKLES',         220);
+insert into ExcludeKeywords values ('MEET SINGLE',            221);
+insert into ExcludeKeywords values ('DISCRETE',               222);
+insert into ExcludeKeywords values ('STOP SNORING',           223);
+insert into ExcludeKeywords values ('REFINANCE',              224);
+insert into ExcludeKeywords values ('YOU HAVE BEEN SELECTED', 225);
+
+
+#
+# Miscellaneous off-topic keywords
+#
+insert into ExcludeKeywords values ('TOY',                    400);
+#insert into ExcludeKeywords values ('INTERVIEW',              401);
+insert into ExcludeKeywords values ('NEWSPAPER',              402);
+#insert into ExcludeKeywords values ('MAGAZINE',               404);
+#insert into ExcludeKeywords values ('PUBLISHING',             405);
+
+
+
+insert into ExcludedSites values ('duckduckgo.com',        100);
+insert into ExcludedSites values ('duck.co',               101);
+insert into ExcludedSites values ('duckduckhack.com',      102);
+insert into ExcludedSites values ('google.com',            103);
+insert into ExcludedSites values ('bing.com',              104);
+insert into ExcludedSites values ('googleusercontent.com', 105);
+insert into ExcludedSites values ('amazon.com',            106);
+insert into ExcludedSites values ('walmart.com',           107);
+insert into ExcludedSites values ('metawellness.com',      108);
+insert into ExcludedSites values ('npr.org',               109);
+insert into ExcludedSites values ('about.com',             110);
+insert into ExcludedSites values ('mapquest.com',          111);
+insert into ExcludedSites values ('bing.com',              112);
+insert into ExcludedSites values ('motherearthnews.com',   113);
+insert into ExcludedSites values ('ask.com',               114);
+insert into ExcludedSites values ('wow.com',               115);
+insert into ExcludedSites values ('webcrawler.com',        116);
+insert into ExcludedSites values ('infospace.com',         117);
+insert into ExcludedSites values ('info.com',              118);
+insert into ExcludedSites values ('dogpile.com',           119);
+insert into ExcludedSites values ('smosh.com',             120);
+insert into ExcludedSites values ('magelo.com',            121);
+insert into ExcludedSites values ('usatoday.com',          122);
+insert into ExcludedSites values ('yahoo.com',             123);
+insert into ExcludedSites values ('youtube.com',           124);
+insert into ExcludedSites values ('wikipedia.org',         125);
+insert into ExcludedSites values ('linkedin.com',          126);
+insert into ExcludedSites values ('wunderground.com',      127);
+insert into ExcludedSites values ('indeed.com',            128);
+insert into ExcludedSites values ('nytimes.com',           129);
+insert into ExcludedSites values ('craigslist.com',        130);
+insert into ExcludedSites values ('justia.com',            131);
+insert into ExcludedSites values ('woodmarketsupport.com', 132);
+insert into ExcludedSites values ('ehow.com',              133);
+insert into ExcludedSites values ('twitter.com',           134);
+insert into ExcludedSites values ('allpages.com',          135);
+insert into ExcludedSites values ('localguides.com',       136);
+insert into ExcludedSites values ('pinterest.com',         137);
+insert into ExcludedSites values ('instagram.com',         138);
+insert into ExcludedSites values ('ebay.com',              139);
+insert into ExcludedSites values ('yelp.com',              140);
+insert into ExcludedSites values ('angieslist.com',        141);
+insert into ExcludedSites values ('videolike.org',         142);
+insert into ExcludedSites values ('foto-mania.org',        143);
+insert into ExcludedSites values ('askjot.com',            144);
+insert into ExcludedSites values ('careerjet.com',         145);
+insert into ExcludedSites values ('wikimapia.com',         146);
+insert into ExcludedSites values ('osha.gov',              147);
+insert into ExcludedSites values ('dreamstime.com',        148);
+insert into ExcludedSites values ('magicyellow.com',       149);
+insert into ExcludedSites values ('manta.com',             150);
+insert into ExcludedSites values ('when.com',              151);
+insert into ExcludedSites values ('foto-mania.org',        152);
+insert into ExcludedSites values ('askjot.com',            153);
+insert into ExcludedSites values ('careerjet.com',         154);
+insert into ExcludedSites values ('dexknows.com',          155);
+insert into ExcludedSites values ('kudzu.com',             156);
+insert into ExcludedSites values ('osha.gov',              157);
+insert into ExcludedSites values ('wn.com',                158);
+insert into ExcludedSites values ('yellowusa.com',         159);
+insert into ExcludedSites values ('whitepages.com',        160);
+insert into ExcludedSites values ('merchantcircle.com',    161);
+insert into ExcludedSites values ('academic.ru',           162);
+insert into ExcludedSites values ('census.gov',            163);
+insert into ExcludedSites values ('sref.info',             164);
+insert into ExcludedSites values ('enacademic.com',        165);
+insert into ExcludedSites values ('google.co.uk',	   166);
+insert into ExcludedSites values ('makeitwood.org',        167);
+insert into ExcludedSites values ('blogger.com',           168);
+insert into ExcludedSites values ('boothster.com', 	   169);
+insert into ExcludedSites values ('shopify.com',           170);
+insert into ExcludedSites values ('yellowpages.com',       171);
+insert into ExcludedSites values ('t.co',                  172);
+insert into ExcludedSites values ('wikimedia.org',   	   173);
+insert into ExcludedSites values ('wikimediafoundation.org', 174);
+insert into ExcludedSites values ('wiktionary.org', 	     175);
+insert into ExcludedSites values ('cltairport.com', 	     176);
+insert into ExcludedSites values ('poinphoto.com', 	     177);
+insert into ExcludedSites values ('craigslist.org', 	     178);
+insert into ExcludedSites values ('reddit.com', 	     179);
+insert into ExcludedSites values ('yellowpagesgoesgreen.org',180);
+insert into ExcludedSites values ('wowcity.com',             181);
+insert into ExcludedSites values ('spreadprivacy.com',       182);
+insert into ExcludedSites values ('adobe.com',               183);
+insert into ExcludedSites values ('allegiancetech.com',      184);
+insert into ExcludedSites values ('flickr.com',              185);
+insert into ExcludedSites values ('socialsecurity.gov',      186);
+insert into ExcludedSites values ('facebook.com',	     187);
+insert into ExcludedSites values ('nuance.com',              188);
+insert into ExcludedSites values ('apple.com',               189);
+insert into ExcludedSites values ('fordaq.com',              190);
+insert into ExcludedSites values ('freedictionary.com',      191);
+insert into ExcludedSites values ('thefreedictionary.com',   192);
+insert into ExcludedSites values ('ftc.gov',		     193);
+insert into ExcludedSites values ('jobcorps.gov',            194);
+insert into ExcludedSites values ('fmc.gov',		     195);
+insert into ExcludedSites values ('freethesaurus.com',       196);
+insert into ExcludedSites values ('thefreelibrary.com',      197);
+insert into ExcludedSites values ('pefc.org',                198);
+insert into ExcludedSites values ('charlotteobserver.com',   199);
+insert into ExcludedSites values ('jwu.edu',                 200);
+insert into ExcludedSites values ('ama-assn.org',            201); 
+insert into ExcludedSites values ('acronymfinder.com',       202);
+insert into ExcludedSites values ('worldplaces.me',          203);
+insert into ExcludedSites values ('homedepot.com',           204);
+insert into ExcludedSites values ('lowes.com',               205);
+insert into ExcludedSites values ('knoxvilletn.gov',         206);
+insert into ExcludedSites values ('acronymattic.com',        207);
+
+GRANT ALL PRIVILEGES ON CLT_KB.* to SpiderRoot;
