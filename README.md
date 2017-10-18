@@ -5,3 +5,4 @@
 
 # tika-app-1.16.jar
 # jsoup-1.9.2.jar
+# mysql-connector-java-5.1.28.jar
