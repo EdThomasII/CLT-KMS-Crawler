@@ -679,5 +679,7 @@ insert into ExcludedSites values ('homedepot.com',           204);
 insert into ExcludedSites values ('lowes.com',               205);
 insert into ExcludedSites values ('knoxvilletn.gov',         206);
 insert into ExcludedSites values ('acronymattic.com',        207);
+insert into ExcludedSites values ('foursquare.com',          208);
+insert into ExcludedSites values ('barnesandnoble.com',      209);
 
 GRANT ALL PRIVILEGES ON CLT_KB.* to SpiderRoot;
