@@ -1,7 +1,7 @@
 ################################################################################
 #     file: CLT-Spider-Revised.mysql
 #   author: Ed Thomas
-# modified: 12-October-2017
+# modified: 8-November-2017
 #  purpose: Preliminary/test-bed design of the mysql tables needed to store and
 #           maintain the CLT Knowledge Base (CLT_KB) system. Running this script
 #           will erase any existing data stored in the CLT_KB. Thus, run this
@@ -25,6 +25,16 @@
 #   categories that can be associated with data. This is not a fixed list and should be
 #   expanded or shortened to suit the needs of the database and its users.
 #
+#   3-Nov-17: Added improved support for tracking the number of links that point to a web
+#             or resource.  After examining the original definition, it was deemed to be
+#             inadequate.
+#   3-Nov-17: Added storage of the the main URL of each site to make statistical queries 
+#             the resources of a single site easier.
+#
+#   7-Nov-17: Added preliminary support for country and language identifiers.  These are 
+#             tentative and may change to support final design.  The countryCode identifiers
+#             are based on the international calling code of the country.
+#
 ################################################################################
 
 DROP DATABASE if exists CLT_KB;
@@ -34,22 +44,38 @@ CREATE DATABASE CLT_KB;
 USE CLT_KB;
 
 create table InformationLink(
-       linkID			int,
+       linkID			int NOT NULL,
        linkURL          	varchar(512),
+       mainURL                  varchar(256),
        linkTitle        	varchar(256),
        linkSynopsis		varchar(1024),
-       referrerID		int,
+#      referrerID		int,        Replaced by ReferrerTrack 3-Nov-17
        downloadPath		varchar(1024),
        discovered		date,
        lastExplored		date,
        keywordCount		int,
+       languageCode             int,
+       countryCode 		int,
        status                   int,
        level			int,
        category			int,
        
        primary key (linkID),
+
        index (linkID),
-       index (linkURL)
+       index (linkURL),
+       index (mainURL),
+       index (lastExplored)
+);
+
+
+create table ReferrerTrack (
+        sourceID          int NOT NULL,
+        destID            int NOT NULL,
+
+        primary key (sourceID, destID),
+        index (sourceID),
+        index (destID)
 );
 
 
@@ -67,6 +93,52 @@ create table KeywordLinkage(
 
        primary key (linkID, keywordID)
 );
+
+
+CREATE TABLE Languages (
+    	languageCode             int,
+    	description              varchar(20),
+   
+    	PRIMARY KEY (languageCode),
+	
+	INDEX (languageCode)
+);
+
+insert into Languages values (1, 'English');
+insert into Languages values (2, 'Spanish');
+insert into Languages values (3, 'French');
+insert into Languages values (4, 'German');
+insert into Languages values (5, 'Soumi');
+insert into Languages values (6, 'Japanese');
+insert into Languages values (99, 'Other');
+
+
+#Do we want to do countries or regions
+CREATE TABLE Countries (
+	countryCode 		int,
+	name 		        varchar(30),
+   
+    	PRIMARY KEY (countryCode),
+	
+	INDEX (countryCode)
+);
+
+insert into Countries values (1,   'United States');
+insert into Countries values (10,  'Canada'); 
+insert into Countries values (52,  'Mexico');
+insert into Countries values (81,  'Japan');
+insert into Countries values (44,  'United Kingdom');
+insert into Countries values (61,  'Australia');
+insert into Countries values (49,  'Germany');
+insert into Countries values (33,  'France');
+insert into Countries values (32,  'Belgium');
+insert into Countries values (31,  'Netherlands');
+insert into Countries values (46,  'Sweden');
+insert into Countries values (358, 'Finland');
+insert into Countries values (41,  'Switzerland');
+insert into Countries values (47,  'Norway');
+insert into Countries values (7,   'Russia');
+insert into Countries values (999, 'Other');
 
 
 CREATE TABLE categories (
@@ -562,124 +634,140 @@ insert into ExcludeKeywords values ('YOU HAVE BEEN SELECTED', 225);
 
 #
 # Miscellaneous off-topic keywords
-#
-insert into ExcludeKeywords values ('TOY',                    400);
-#insert into ExcludeKeywords values ('INTERVIEW',              401);
-insert into ExcludeKeywords values ('NEWSPAPER',              402);
-#insert into ExcludeKeywords values ('MAGAZINE',               404);
-#insert into ExcludeKeywords values ('PUBLISHING',             405);
+# 
+insert into ExcludeKeywords values ('TOY',                     400);
+insert into ExcludeKeywords values ('NEWSPAPER',               402);
+insert into ExcludeKeywords values ('CLASSIC LEARNING',        403);
+insert into ExcludeKeywords values ('CHARLOTTE DOUGLAS',       404);
+insert into ExcludeKeywords values ('CHARLOTTE INTERNATIONAL', 405);
+insert into ExcludeKeywords values ('CHARLOTTE AIRPORT',       406);
 
 
+insert into ExcludedSites values ('duckduckgo.com',            100);
+insert into ExcludedSites values ('duck.co',                   101);
+insert into ExcludedSites values ('duckduckhack.com',          102);
+insert into ExcludedSites values ('google.com',                103);
+insert into ExcludedSites values ('bing.com',                  104);
+insert into ExcludedSites values ('googleusercontent.com',     105);
+insert into ExcludedSites values ('amazon.com',                106);
+insert into ExcludedSites values ('walmart.com',               107);
+insert into ExcludedSites values ('metawellness.com',          108);
+insert into ExcludedSites values ('npr.org',                   109);
+insert into ExcludedSites values ('about.com',                 110);
+insert into ExcludedSites values ('mapquest.com',              111);
+insert into ExcludedSites values ('bing.com',                  112);
+insert into ExcludedSites values ('motherearthnews.com',       113);
+insert into ExcludedSites values ('ask.com',                   114);
+insert into ExcludedSites values ('wow.com',                   115);
+insert into ExcludedSites values ('webcrawler.com',            116);
+insert into ExcludedSites values ('infospace.com',             117);
+insert into ExcludedSites values ('info.com',                  118);
+insert into ExcludedSites values ('dogpile.com',               119);
+insert into ExcludedSites values ('smosh.com',                 120);
+insert into ExcludedSites values ('magelo.com',                121);
+insert into ExcludedSites values ('usatoday.com',              122);
+insert into ExcludedSites values ('yahoo.com',                 123);
+insert into ExcludedSites values ('youtube.com',               124);
+insert into ExcludedSites values ('wikipedia.org',             125);
+insert into ExcludedSites values ('linkedin.com',              126);
+insert into ExcludedSites values ('wunderground.com',          127);
+insert into ExcludedSites values ('indeed.com',                128);
+insert into ExcludedSites values ('nytimes.com',               129);
+insert into ExcludedSites values ('craigslist.com',            130);
+insert into ExcludedSites values ('justia.com',                131);
+insert into ExcludedSites values ('woodmarketsupport.com',     132);
+insert into ExcludedSites values ('ehow.com',                  133);
+insert into ExcludedSites values ('twitter.com',               134);
+insert into ExcludedSites values ('allpages.com',              135);
+insert into ExcludedSites values ('localguides.com',           136);
+insert into ExcludedSites values ('pinterest.com',             137);
+insert into ExcludedSites values ('instagram.com',             138);
+insert into ExcludedSites values ('ebay.com',                  139);
+insert into ExcludedSites values ('yelp.com',                  140);
+insert into ExcludedSites values ('angieslist.com',            141);
+insert into ExcludedSites values ('videolike.org',             142);
+insert into ExcludedSites values ('foto-mania.org',            143);
+insert into ExcludedSites values ('askjot.com',                144);
+insert into ExcludedSites values ('careerjet.com',             145);
+insert into ExcludedSites values ('wikimapia.com',             146);
+insert into ExcludedSites values ('osha.gov',                  147);
+insert into ExcludedSites values ('dreamstime.com',            148);
+insert into ExcludedSites values ('magicyellow.com',           149);
+insert into ExcludedSites values ('manta.com',                 150);
+insert into ExcludedSites values ('when.com',                  151);
+insert into ExcludedSites values ('foto-mania.org',            152);
+insert into ExcludedSites values ('askjot.com',                153);
+insert into ExcludedSites values ('careerjet.com',             154);
+insert into ExcludedSites values ('dexknows.com',              155);
+insert into ExcludedSites values ('kudzu.com',                 156);
+insert into ExcludedSites values ('osha.gov',                  157);
+insert into ExcludedSites values ('wn.com',                    158);
+insert into ExcludedSites values ('yellowusa.com',             159);
+insert into ExcludedSites values ('whitepages.com',            160);
+insert into ExcludedSites values ('merchantcircle.com',        161);
+insert into ExcludedSites values ('academic.ru',               162);
+insert into ExcludedSites values ('census.gov',                163);
+insert into ExcludedSites values ('sref.info',                 164);
+insert into ExcludedSites values ('enacademic.com',            165);
+insert into ExcludedSites values ('google.co.uk',	       166);
+insert into ExcludedSites values ('makeitwood.org',            167);
+insert into ExcludedSites values ('blogger.com',               168);
+insert into ExcludedSites values ('boothster.com', 	       169);
+insert into ExcludedSites values ('shopify.com',               170);
+insert into ExcludedSites values ('yellowpages.com',           171);
+insert into ExcludedSites values ('t.co',                      172);
+insert into ExcludedSites values ('wikimedia.org',   	       173);
+insert into ExcludedSites values ('wikimediafoundation.org',   174);
+insert into ExcludedSites values ('wiktionary.org', 	       175);
+insert into ExcludedSites values ('cltairport.com', 	       176);
+insert into ExcludedSites values ('poinphoto.com', 	       177);
+insert into ExcludedSites values ('craigslist.org', 	       178);
+insert into ExcludedSites values ('reddit.com', 	       179);
+insert into ExcludedSites values ('yellowpagesgoesgreen.org',  180);
+insert into ExcludedSites values ('wowcity.com',               181);
+insert into ExcludedSites values ('spreadprivacy.com',         182);
+insert into ExcludedSites values ('adobe.com',                 183);
+insert into ExcludedSites values ('allegiancetech.com',        184);
+insert into ExcludedSites values ('flickr.com',                185);
+insert into ExcludedSites values ('socialsecurity.gov',        186);
+insert into ExcludedSites values ('facebook.com',	       187);
+insert into ExcludedSites values ('nuance.com',                188);
+insert into ExcludedSites values ('apple.com',                 189);
+insert into ExcludedSites values ('fordaq.com',                190);
+insert into ExcludedSites values ('freedictionary.com',        191);
+insert into ExcludedSites values ('thefreedictionary.com',     192);
+insert into ExcludedSites values ('ftc.gov',		       193);
+insert into ExcludedSites values ('jobcorps.gov',              194);
+insert into ExcludedSites values ('fmc.gov',		       195);
+insert into ExcludedSites values ('freethesaurus.com',         196);
+insert into ExcludedSites values ('thefreelibrary.com',        197);
+insert into ExcludedSites values ('pefc.org',                  198);
+insert into ExcludedSites values ('charlotteobserver.com',     199);
+insert into ExcludedSites values ('jwu.edu',                   200);
+insert into ExcludedSites values ('ama-assn.org',              201); 
+insert into ExcludedSites values ('acronymfinder.com',         202);
+insert into ExcludedSites values ('worldplaces.me',            203);
+insert into ExcludedSites values ('homedepot.com',             204);
+insert into ExcludedSites values ('lowes.com',                 205);
+insert into ExcludedSites values ('knoxvilletn.gov',           206);
+insert into ExcludedSites values ('acronymattic.com',          207);
+insert into ExcludedSites values ('foursquare.com',            208);
+insert into ExcludedSites values ('barnesandnoble.com',        209);
+insert into ExcludedSites values ('converse.com',              210);
+insert into ExcludedSites values ('chesapeakelighttackle.com', 211);
+insert into ExcludedSites values ('homedepot.ca',              212);
+insert into ExcludedSites values ('tumbler.com',               213);
+insert into ExcludedSites values ('internetslang.com',         214);
+insert into ExcludedSites values ('mediawiki.org',             215);
+insert into ExcludedSites values ('nike.com',                  216);
+insert into ExcludedSites values ('lowes.ca',                  217);
+insert into ExcludedSites values ('wikidata.org',              218);
+insert into ExcludedSites values ('statcounter.com',           219);
+insert into ExcludedSites values ('microsoft.com',             220);
+insert into ExcludedSites values ('lynda.com',                 221);
+insert into ExcludedSites values ('proz.com',                  222);
+insert into ExcludedSites values ('shawfloors.com',            223);
+insert into ExcludedSites values ('pergo.com',                 224);
 
-insert into ExcludedSites values ('duckduckgo.com',        100);
-insert into ExcludedSites values ('duck.co',               101);
-insert into ExcludedSites values ('duckduckhack.com',      102);
-insert into ExcludedSites values ('google.com',            103);
-insert into ExcludedSites values ('bing.com',              104);
-insert into ExcludedSites values ('googleusercontent.com', 105);
-insert into ExcludedSites values ('amazon.com',            106);
-insert into ExcludedSites values ('walmart.com',           107);
-insert into ExcludedSites values ('metawellness.com',      108);
-insert into ExcludedSites values ('npr.org',               109);
-insert into ExcludedSites values ('about.com',             110);
-insert into ExcludedSites values ('mapquest.com',          111);
-insert into ExcludedSites values ('bing.com',              112);
-insert into ExcludedSites values ('motherearthnews.com',   113);
-insert into ExcludedSites values ('ask.com',               114);
-insert into ExcludedSites values ('wow.com',               115);
-insert into ExcludedSites values ('webcrawler.com',        116);
-insert into ExcludedSites values ('infospace.com',         117);
-insert into ExcludedSites values ('info.com',              118);
-insert into ExcludedSites values ('dogpile.com',           119);
-insert into ExcludedSites values ('smosh.com',             120);
-insert into ExcludedSites values ('magelo.com',            121);
-insert into ExcludedSites values ('usatoday.com',          122);
-insert into ExcludedSites values ('yahoo.com',             123);
-insert into ExcludedSites values ('youtube.com',           124);
-insert into ExcludedSites values ('wikipedia.org',         125);
-insert into ExcludedSites values ('linkedin.com',          126);
-insert into ExcludedSites values ('wunderground.com',      127);
-insert into ExcludedSites values ('indeed.com',            128);
-insert into ExcludedSites values ('nytimes.com',           129);
-insert into ExcludedSites values ('craigslist.com',        130);
-insert into ExcludedSites values ('justia.com',            131);
-insert into ExcludedSites values ('woodmarketsupport.com', 132);
-insert into ExcludedSites values ('ehow.com',              133);
-insert into ExcludedSites values ('twitter.com',           134);
-insert into ExcludedSites values ('allpages.com',          135);
-insert into ExcludedSites values ('localguides.com',       136);
-insert into ExcludedSites values ('pinterest.com',         137);
-insert into ExcludedSites values ('instagram.com',         138);
-insert into ExcludedSites values ('ebay.com',              139);
-insert into ExcludedSites values ('yelp.com',              140);
-insert into ExcludedSites values ('angieslist.com',        141);
-insert into ExcludedSites values ('videolike.org',         142);
-insert into ExcludedSites values ('foto-mania.org',        143);
-insert into ExcludedSites values ('askjot.com',            144);
-insert into ExcludedSites values ('careerjet.com',         145);
-insert into ExcludedSites values ('wikimapia.com',         146);
-insert into ExcludedSites values ('osha.gov',              147);
-insert into ExcludedSites values ('dreamstime.com',        148);
-insert into ExcludedSites values ('magicyellow.com',       149);
-insert into ExcludedSites values ('manta.com',             150);
-insert into ExcludedSites values ('when.com',              151);
-insert into ExcludedSites values ('foto-mania.org',        152);
-insert into ExcludedSites values ('askjot.com',            153);
-insert into ExcludedSites values ('careerjet.com',         154);
-insert into ExcludedSites values ('dexknows.com',          155);
-insert into ExcludedSites values ('kudzu.com',             156);
-insert into ExcludedSites values ('osha.gov',              157);
-insert into ExcludedSites values ('wn.com',                158);
-insert into ExcludedSites values ('yellowusa.com',         159);
-insert into ExcludedSites values ('whitepages.com',        160);
-insert into ExcludedSites values ('merchantcircle.com',    161);
-insert into ExcludedSites values ('academic.ru',           162);
-insert into ExcludedSites values ('census.gov',            163);
-insert into ExcludedSites values ('sref.info',             164);
-insert into ExcludedSites values ('enacademic.com',        165);
-insert into ExcludedSites values ('google.co.uk',	   166);
-insert into ExcludedSites values ('makeitwood.org',        167);
-insert into ExcludedSites values ('blogger.com',           168);
-insert into ExcludedSites values ('boothster.com', 	   169);
-insert into ExcludedSites values ('shopify.com',           170);
-insert into ExcludedSites values ('yellowpages.com',       171);
-insert into ExcludedSites values ('t.co',                  172);
-insert into ExcludedSites values ('wikimedia.org',   	   173);
-insert into ExcludedSites values ('wikimediafoundation.org', 174);
-insert into ExcludedSites values ('wiktionary.org', 	     175);
-insert into ExcludedSites values ('cltairport.com', 	     176);
-insert into ExcludedSites values ('poinphoto.com', 	     177);
-insert into ExcludedSites values ('craigslist.org', 	     178);
-insert into ExcludedSites values ('reddit.com', 	     179);
-insert into ExcludedSites values ('yellowpagesgoesgreen.org',180);
-insert into ExcludedSites values ('wowcity.com',             181);
-insert into ExcludedSites values ('spreadprivacy.com',       182);
-insert into ExcludedSites values ('adobe.com',               183);
-insert into ExcludedSites values ('allegiancetech.com',      184);
-insert into ExcludedSites values ('flickr.com',              185);
-insert into ExcludedSites values ('socialsecurity.gov',      186);
-insert into ExcludedSites values ('facebook.com',	     187);
-insert into ExcludedSites values ('nuance.com',              188);
-insert into ExcludedSites values ('apple.com',               189);
-insert into ExcludedSites values ('fordaq.com',              190);
-insert into ExcludedSites values ('freedictionary.com',      191);
-insert into ExcludedSites values ('thefreedictionary.com',   192);
-insert into ExcludedSites values ('ftc.gov',		     193);
-insert into ExcludedSites values ('jobcorps.gov',            194);
-insert into ExcludedSites values ('fmc.gov',		     195);
-insert into ExcludedSites values ('freethesaurus.com',       196);
-insert into ExcludedSites values ('thefreelibrary.com',      197);
-insert into ExcludedSites values ('pefc.org',                198);
-insert into ExcludedSites values ('charlotteobserver.com',   199);
-insert into ExcludedSites values ('jwu.edu',                 200);
-insert into ExcludedSites values ('ama-assn.org',            201); 
-insert into ExcludedSites values ('acronymfinder.com',       202);
-insert into ExcludedSites values ('worldplaces.me',          203);
-insert into ExcludedSites values ('homedepot.com',           204);
-insert into ExcludedSites values ('lowes.com',               205);
-insert into ExcludedSites values ('knoxvilletn.gov',         206);
-insert into ExcludedSites values ('acronymattic.com',        207);
-insert into ExcludedSites values ('foursquare.com',          208);
-insert into ExcludedSites values ('barnesandnoble.com',      209);
 
 GRANT ALL PRIVILEGES ON CLT_KB.* to SpiderRoot;

@@ -1,7 +1,7 @@
 /*
  *   Program: CLT_Spider
  *    Author: Ed Thomas
- *  Modified: 17-October-2017
+ *  Modified: 17-November-2017
  *      Uses: FindKeywords (to search web documents for keywords)
  *            JSoup to handle http/html requests and parsing.
  *            MySQL (java.sql.*) for database
@@ -64,7 +64,6 @@ import org.jsoup.select.Elements;
 import java.sql.*;
 import java.lang.String.*;
 
-//import java.net.*;
 import java.net.URL;
 import java.net.URLConnection;
 import java.net.HttpURLConnection;
@@ -72,6 +71,9 @@ import java.net.URLEncoder;
 import java.net.MalformedURLException;
 
 import java.util.Calendar;
+import java.util.Date;
+
+import java.text.SimpleDateFormat;
 
 import java.io.File;
 import java.io.IOException;
@@ -80,33 +82,37 @@ import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.io.FileWriter;
 import java.io.InputStreamReader;
 
 
 /*
  *    Class: CLT_Spider
- * Modified: 24-July-2016
+ * Modified: 7-November-2017
  *  Purpose: Main web spider/crawler class., referrerID
  *
  */
 public class CLT_Spider  {
     SpiderSQLConnect dBase;
     Connection connection;
-
-    private static final int MAX_TRAVERSE_DEPTH = 7; // n=Need to do some experimentatation with this
-                                                     // to determine best value.
-                                                     // Note: link depth numbering starts at (top level) and ends
-                                                     // at MAX_TRAVERSE_DEPTH, ie: the lowest level. Root level
-                                                     // urls have , referrerIDa "0" level.
-    private static final int DAYS_TO_LIVE = 30;      // Maximum number of days a web page link lives before it
-                                                     // must be updated.
     
-    private static final int LINK_LIMIT = 10000;      // Limits the number of links traversed during web crawl.  Set to
+    CrawlerErrorLogger ErrorLog = null;
+
+    private static final int MAX_TRAVERSE_DEPTH = 10; // n=Need to do some experimentatation with this
+                                                      // to determine best value.
+                                                      // Note: link depth numbering starts at (top level) and ends
+                                                      // at MAX_TRAVERSE_DEPTH, ie: the lowest level. Root level
+                                                      // urls have , referrerIDa "0" level.
+    private static final int DAYS_TO_LIVE = 30;       // Maximum number of days a web page link lives before it
+                                                      // must be updated.
+    
+    private static final int LINK_LIMIT = 25000;      // Limits the number of links traversed during web crawl.  Set to
                                                       // arbitrary high number to traverse a large number of links in a 
                                                       // for a production session. Or, to a low number for algorithm
                                                       // testing
     
-    private static final int NO_KEYWORD_SEARCH_DEPTH = 4;  // Limits the search depth of links which have no keywords 
+    private static final int NO_KEYWORD_SEARCH_DEPTH = 5;  // Limits the search depth of links which have no keywords 
                                                       // found to the number specified.  Intent is that this will 
                                                       // allow the spider to trawl more deeply on sites that may have
                                                       // resources.
@@ -148,8 +154,9 @@ public class CLT_Spider  {
 	CLT_Spider spider = new CLT_Spider();
 	
 	System.out.println("CLT_Spider Starting......\n");
-
+        
 	spider.InitializeKeywordsExcludes();
+	spider.StartErrorLog();
         
 	if (args.length >= 1) {
             processOption = args[0].toLowerCase();
@@ -189,8 +196,8 @@ public class CLT_Spider  {
             
 	} else {
 	    System.out.println("\nERROR: CLT_Spider processing mode un-specified!");
-            System.out.println("The possible options are:\n");
-            System.out.println("         java CLT_Spider file <file_of_links.html> ");
+		System.out.println("The possible options are:\n");
+        System.out.println("         java CLT_Spider file <file_of_links.html> ");
 	    System.out.println("         java CLT_Spider crawl <EXPLORE|UPDATE|RESOURCE>");
 	    System.out.println("	 java CLT_Spider url \n");
 	    System.out.println("Use the crawl option to concentrate on building the database. Use");
@@ -205,16 +212,19 @@ public class CLT_Spider  {
    
 
     public void CLT_Spider() {
+       
+        
 	dBase = new SpiderSQLConnect();
 	connection = dBase.dbConnect();
 	System.out.println("MySql link to CLT_Spider Database established.");
+        
+        
     } // empty constructor
-
 
     
     /*
      *   method: fileExplore
-     * modified: 28-September-2017
+     * modified: 3-November-2017
      *   author: Ed Thomas
      *  purpose: Reads the data seeding information from an initialization html file. Each URL is  
      *           passed to processURL where it reads the web page, searches for keywords and  
@@ -242,15 +252,18 @@ public class CLT_Spider  {
             File in = new File(Path);
             doc = Jsoup.parse(in, null);
         } catch (Exception e) { 
-	    System.out.println("ERROR during crawl Database unexplored URL query!"); 
-	    System.out.println("General Exception: " + e.getMessage());       
+			System.out.println("ERROR Unable to open and read URL seed file!"); 
+			System.out.println("General Exception: " + e.getMessage());
+            
+            ErrorLog.WriteErrMsg(e, "N/A", 0, "FileExplore (ERROR) Exception encountered opening and reading",
+                    "URL seed file: "+Path);
         }
         
         if (doc != null) {
 	    try {
-		links = doc.select("a[href]");
+			links = doc.select("a[href]");
 	    } catch (NullPointerException npe) {
-		print("doc body read error");
+			print("doc body read error");
 	    }
 	    
 	    print("\nLinks: (%d)", links.size());
@@ -278,7 +291,7 @@ public class CLT_Spider  {
     
     /*
      *   method: crawlInformationLinks
-     * modified: 29-September-2017
+     * modified: 1-November-2017
      *  purpose: Crawls the database of existing links and crawl unexplored or 
      *           out-of-date links. Current version only examines un-explored 
      *           links.
@@ -419,8 +432,13 @@ public class CLT_Spider  {
 	} catch (Exception e) { 
 	    System.out.println("ERROR during crawl Database unexplored URL query!"); 
 	    System.out.println("General Exception: " + e.getMessage());
+            
+            ErrorLog.WriteErrMsg(e, "N/A", 0, "CrawlInformationLinks (ERROR) Exception encountered during mysql query for",
+                    "links to explore / update!");
 	} 
+        
 	dBase.dbClose();
+        ErrorLog.haltLogger(); // Stop the Error Logging stream
     } // crawlInformationLinks
     
     
@@ -428,7 +446,7 @@ public class CLT_Spider  {
     
     /*
      *    method: processURL
-     *  modified: 6-October-2017
+     *  modified: 8-November-2017
      *   purpose: Crawls the the URL specified in the argument and stores all  
      *            keyword and sub-url links.
      * IMPORTANT: Currently, the method only performs the explore (update = false) operation.
@@ -451,6 +469,7 @@ public class CLT_Spider  {
 	int i, matchKeywordCount=0, linkCount=0;
 	int [] matchingKeywordID = new int[MAX_KEYWORDS];
     	int URL_Status = STATUS_EXPLORED_A;
+        int storedLinkID;
         int status=0, age=0;
 	Document doc=null;
 	String text, rootLinkURL, mainLinkURL;
@@ -473,7 +492,12 @@ public class CLT_Spider  {
 	print("Processing: %s",url);
         print("rootURL: %s", rootURL);
         print("mainURL: %s", mainURL);
-		
+
+	if (mode == MASTER_MODE) {
+            dBase = new SpiderSQLConnect();
+            connection = dBase.dbConnect();
+        }
+	
         if (excludeURL(mainURL, excludeSites, excludeSiteCount)){
             print("ERROR: URL is on exclude list!", mainURL);
             return 0;
@@ -490,9 +514,11 @@ public class CLT_Spider  {
 	// see if rootURL probe is allowed.  If so, add it to queue.
 	if (!isForbiddenLink(rootURL, Verboten, disallowCount) &&
 	    !isDuplicateLink(rootURL)) {
-                storeInformationLink(rootURL, " ", " ", " ",
-                                     discoverDate, null,
-                                     0, STATUS_UNEXPLORED, 0, -1, referrerID);
+                storedLinkID = storeInformationLink(rootURL, " ", " ", " ",
+                                     todaysDate, null,0, STATUS_UNEXPLORED, 0, -1);
+                if (storedLinkID > 1) { // error condition is 0 or -1
+                    storeReferrerLink(storedLinkID, referrerID);
+                } // Valid storedLinkID check
 		
 	} // rootURL okay to probe?
 	
@@ -504,11 +530,6 @@ public class CLT_Spider  {
 	    System.out.println("url probe disallowed in robots.txt");
 	    return 0;
 	} // permitted to probe URL?
-	
-        if (mode == MASTER_MODE) {
-            dBase = new SpiderSQLConnect();
-            connection = dBase.dbConnect();
-        }
         
 	/*
 	 * Intercept links to web documents, download and index them to the link
@@ -547,6 +568,8 @@ public class CLT_Spider  {
                 } catch (Exception e) { 
 			System.out.println("ERROR during DuplicateLink URL query Method 1:"); 
 			System.out.println("General Exception: " + e.getMessage());
+                        
+                        ErrorLog.WriteErrMsg(e, url, 0, "ProcessURL (1) (ERROR) Exception encountered during DuplicateLink URL query Method.", " ");
 		}
             } else {            // linkID is known so we can get the status with a simpler query.
                 String statusQuery = "Select status, discovered, (to_Days(?)- to_days(discovered))" +
@@ -566,6 +589,8 @@ public class CLT_Spider  {
                 } catch (Exception e) { 
 			System.out.println("ERROR during DuplicateLink URL query Method 1:"); 
 			System.out.println("General Exception: " + e.getMessage());
+                        
+                        ErrorLog.WriteErrMsg(e, url, 0, "ProcessURL (2) (ERROR) Exception encountered during DuplicateLink URL query Method.", " ");
 		}
              } // linkID known?
             
@@ -588,6 +613,8 @@ public class CLT_Spider  {
             discoverDate = todaysDate;
         }// isDuplicateLink
 	
+        if (discoverDate == null)
+                discoverDate = todaysDate;
         
 	try {
 	    doc = Jsoup
@@ -597,9 +624,12 @@ public class CLT_Spider  {
 		.get();
 	} catch (IOException e) {
 	    System.out.println("URL DOC IOException: " + e.getMessage());
-	    storeInformationLink(url, " ", " ", " ",discoverDate, todaysDate,0, 
-				 STATUS_WEB_ERROR, level, linkID, referrerID);
-	}
+	    storedLinkID = storeInformationLink(url, " ", " ", " ",discoverDate, todaysDate, 0, 
+				 STATUS_WEB_ERROR, level, linkID);
+            if (storedLinkID > 1) { // error condition is 0 or -1
+                    storeReferrerLink(storedLinkID, referrerID);
+            } // Valid storedLinkID check
+	} // try / catch block
 	
         
 	if (doc != null) {
@@ -643,8 +673,13 @@ public class CLT_Spider  {
                 
 		linkID = storeInformationLink(url, title, synopsis, " ",
 					      discoverDate, todaysDate, 
-					      matchKeywordCount, STATUS_EXPLORED_A, level, linkID, referrerID);
-
+					      matchKeywordCount, STATUS_EXPLORED_A, level, linkID);
+                
+                if (linkID > 1) { // error condition is 0 or -1
+                    storeReferrerLink(linkID, referrerID);
+                } // Valid storedLinkID check
+                
+                
 		if (finder != null) {
 		    matchingKeywordID = finder.getMatching();
 		    
@@ -655,11 +690,18 @@ public class CLT_Spider  {
                 } else {
 		    System.out.println("Error: Finder not initialized in ProcessURL!");
                     System.out.println("Cascade error from Doc Body Read: Processing of this URL ending");
-                    storeInformationLink(url, " ", " ", " ",discoverDate, todaysDate,0, 
-                                STATUS_WEB_ERROR, level, linkID, referrerID);
+                    
+                    ErrorLog.WriteErrMsg(null, url, linkID, "ProcessURL (Warning) Finder not initialized in ProcessURL!",
+                            "Cascade error from Doc Body Read: Processing of this URL ending!");
+                    
+                    storedLinkID = storeInformationLink(url, " ", " ", " ",discoverDate, todaysDate,0, 
+                                STATUS_WEB_ERROR, level, linkID);
+                    
+                    if (storedLinkID > 1) { // error condition is 0 or -1
+                        storeReferrerLink(storedLinkID, referrerID);
+                    } // Valid storedLinkID check
                     return 0;
 		}
-
 		
                 /*
                  * Loop through the links found on this web site and store them for 
@@ -683,6 +725,7 @@ public class CLT_Spider  {
                     } else if (isResource(linkURL)) {
                         if (!resourceInterceptor(linkURL, -1, level+1, referrerID)) {
                             System.out.println("Error handling resource at: " + linkURL);
+                            ErrorLog.WriteErrMsg(null, linkURL, linkID, "ProcessURL (Error) Problems encountered handling resource at URL!", "");
                         }
 		    } else {
 			print(" * a: <%s>  (%s)", link.attr("abs:href"), trim(link.text(), 35));
@@ -699,8 +742,12 @@ public class CLT_Spider  {
 			     * Current link belongs to the site currently being examined.
 			     */
 			    //System.out.println("Storing A: " + linkURL);
-                            storeInformationLink(linkURL, " ", " ", " ", todaysDate, null,
-                                                 0, STATUS_UNEXPLORED, level+1, -1, referrerID);
+                            storedLinkID = storeInformationLink(linkURL, " ", " ", " ", todaysDate, null,
+                                                 0, STATUS_UNEXPLORED, level+1, -1);
+                            
+                            if (storedLinkID > 1) { // error condition is 0 or -1
+                                storeReferrerLink(storedLinkID, referrerID);
+                            } // Valid storedLinkID check
 			    linkCount++;
 			} else {
 			    // Current link is external to the site being examined, 
@@ -708,8 +755,12 @@ public class CLT_Spider  {
 			    if (!excludeURL(mainLinkURL, excludeSites, excludeSiteCount)
 				&& rootLinkURL.length() > 5) {
 				//System.out.println("Storing B: " + linkURL);
-                                storeInformationLink(linkURL, " ", " ", " ", todaysDate, null,
-						     0, STATUS_UNEXPLORED, 1, -1, referrerID);
+                                storedLinkID = storeInformationLink(linkURL, " ", " ", " ", todaysDate, null,
+						     0, STATUS_UNEXPLORED, 1, -1);
+                                
+                                if (storedLinkID > 1) { // error condition is 0 or -1
+                                    storeReferrerLink(storedLinkID, referrerID);
+                                } // Valid storedLinkID check
 				linkCount++;
 			    }
 			} // if internal/external link
@@ -721,28 +772,38 @@ public class CLT_Spider  {
 		 * Two options, store the link as a bad one.  Or delete the link.  At this
 		 * point we just save the link.
 		 */
-		storeInformationLink(url, " ", " ", " ", discoverDate, todaysDate,
-				     0, STATUS_EXPLORED_F, level, linkID, referrerID);
+		storedLinkID = storeInformationLink(url, " ", " ", " ", discoverDate, todaysDate,
+				     0, STATUS_EXPLORED_F, level, linkID);
+                
+                if (storedLinkID > 1) { // error condition is 0 or -1
+                    storeReferrerLink(storedLinkID, referrerID);
+                } // Valid storedLinkID check
 	    } // matchKeywordCount > 0
 	} else  { 
             /*
              * doc is null, which means there was an error reading the website.
              * store the error condition in the database.
              */
-            storeInformationLink(url, " ", " ", " ",discoverDate, todaysDate, 0, 
-				 STATUS_WEB_ERROR, level, -1, referrerID);
+            storedLinkID = storeInformationLink(url, " ", " ", " ",discoverDate, todaysDate, 0, 
+				 STATUS_WEB_ERROR, level, -1);
+            
+            if (storedLinkID > 1) { // error condition is 0 or -1
+                    storeReferrerLink(storedLinkID, referrerID);
+                } // Valid storedLinkID check
         }// doc != null
         
 	if (mode == MASTER_MODE) {
             dBase.dbClose();
-        }
+            ErrorLog.haltLogger();
+        } // MASTER_MODE
+        
 	return linkCount;
     } // process method
       
 
     /*
      *   method: storeKeywords
-     * modified: 26-July-2016
+     * modified: 3-November-2017
      *  purpose: Stores the keyword ID#'s for supplied URL SerialNumber.
      *  returns: nothing
      */
@@ -762,6 +823,8 @@ public class CLT_Spider  {
 	    } catch (Exception e) { 
 		System.out.println("StoreKeywords: Error during URL keyword storage"); 
 		System.out.println("General Exception: " + e.getMessage());
+                
+                ErrorLog.WriteErrMsg(e, "N/A", linkID, "StoreKeywords (ERROR) General exception during URL keyword storage.", " ");
 	    }
 	} // i
     } // storeKeywords
@@ -770,7 +833,7 @@ public class CLT_Spider  {
 
     /*
      *     method: storeInformationLink
-     *   modified: 6-October-2017
+     *   modified: 8-November-2017
      *    purpose: Stores the information for a data or information link.  If the 
      *             URL already exists, then the method updates the existing data.
      * 
@@ -785,16 +848,16 @@ public class CLT_Spider  {
      */
     private int storeInformationLink(String URL, String title, String synopsis, String resourcePath,
 				     java.sql.Date discoverDate, java.sql.Date exploreDate, 
-				     int keywordCount, int status, int level, int linkID, int referrerID) 
+				     int keywordCount, int status, int level, int linkID)  
     {
         int existsCount = 0; //, storedStatus;
 	PreparedStatement st;
 	ResultSet rs;
-	String uppercaseURL;
+	String uppercaseURL, mainURL;
         
         String URL_Store = "INSERT into InformationLink (linkID, "+
-	                   "linkURL, linkTitle, linkSynopsis, downloadPath, discovered, " +
-	                   "lastExplored, keywordCount, status, level, referrerID) " +
+	                   "linkURL, mainURL, linkTitle, linkSynopsis, downloadPath, discovered, " +
+	                   "lastExplored, keywordCount, status, level) " +
 	                   "values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 	String URL_Update = "Update InformationLink set " +
 	                    "linkTitle=?, linkSynopsis=?, " +
@@ -802,9 +865,21 @@ public class CLT_Spider  {
 	                    "keywordCount=?, status=? " +
 	                    "where linkID=?";
 	
+        if (discoverDate == null) {
+            System.out.println("ERROR: discoverDate is null! Internal logic error!");
+            System.out.println("URL: <<<" + URL + ">>> NOT STORED!");
+            ErrorLog.WriteErrMsg(null, URL, linkID, "StoreInformationLink (ERROR) discoverDate is null! Internal logic error!",
+                    "This URL record was not stored!");
+            
+            return -1;
+        } //discoverDate == null
+        
+        
 	// Check search depth for current url traverse.
 	if (level >  MAX_TRAVERSE_DEPTH) {
 	    System.out.println("Maximum search depth reached for URL! Search Halted.");
+            ErrorLog.WriteErrMsg(null, URL, linkID, "StoreInformationLink (Warning) Maximum search depth reached for this URL.",
+                        "Crawl for this URL halted!");
 	    return 0;
 	}
 	
@@ -825,9 +900,14 @@ public class CLT_Spider  {
         //System.out.println("URL: "+URL);
         //System.out.println("------------------------------------------");
 	
+        mainURL = getMainURL(getRootURL(URL));
+        
 	if (isDuplicateLink(URL)) { // link is already in the CLT_KB, get it's linkID
 	    if (linkID == -1) {
                 System.out.println("storeInformationLink: Error: linkID not set for existing CLT_KB url!");
+                
+                ErrorLog.WriteErrMsg(null, URL, linkID, "StoreInformationLink (Warning) linkID not set for an existing",
+                        "CLT_KB InformationLink URL!");
                 return -1;
             }
 	    
@@ -847,7 +927,10 @@ public class CLT_Spider  {
 		
 	    } catch (Exception e) {
 		System.out.println("ERROR during InformationLink data update!"); 
-		System.out.println("General Exception: " + e.getMessage());
+		System.out.println("General Exception: " + e.getMessage()); 
+                
+                ErrorLog.WriteErrMsg(e, URL, linkID, "StoreInformationLink (Error) Exception encountered during",
+                        "InformationLink data update!");
                 return -1;
 	    } // try/catch block
 	} else {    // Link is new, and is NOT in the CLT_KB
@@ -859,48 +942,132 @@ public class CLT_Spider  {
 		st = connection.prepareStatement(URL_Store);
 		st.setInt    (1, linkID);
 		st.setString (2, URL);
-		st.setString (3, title);
-		st.setString (4, synopsis);
-		st.setString (5, resourcePath);
-		st.setDate   (6, discoverDate);
-		st.setDate   (7, exploreDate);
-		st.setInt    (8, keywordCount);
-		st.setInt    (9, status);
-		st.setInt    (10, level);
-                st.setInt    (11, referrerID);
+                st.setString (3, mainURL);
+		st.setString (4, title);
+		st.setString (5, synopsis);
+		st.setString (6, resourcePath);
+		st.setDate   (7, discoverDate);
+		st.setDate   (8, exploreDate);
+		st.setInt    (9, keywordCount);
+		st.setInt    (10, status);
+		st.setInt    (11, level);
 		st.execute();
 		st.close();
 	    } catch (Exception e) { 
 		System.out.println("ERROR during InformationLink data insert!"); 
 		System.out.println("General Exception: " + e.getMessage());
+                
+                ErrorLog.WriteErrMsg(e, URL, linkID, "StoreInformationLink (Error) Exception encountered during",
+                        "InformationLink data insert!");
                 return -1;
 	    } // try/catch
 	} // linkExists?
    
         return linkID;
     } // storeInformationLInk
+
+
     
+    /*
+     *   method: storeReferrerLink
+     * modified: 17-November-2017
+     *  purpose: Stores the linkages among the web sites crawled.  Using the data
+     *           stored, we can determine which sites link to a specific paper or
+     *           other site.
+     *  returns: true if successful
+     *           false upon failure/error condition
+     */
+    private boolean storeReferrerLink(int sourceID, int destID){
+        PreparedStatement st;
+        String InsertLink = "INSERT into ReferrerTrack (sourceID, destID) values (?, ?)";
+
+	// Don't store referrer linkage for links from the seed file. ie: the fact that it
+	// was referred to by the seed file is meaningless for us.
+	if (sourceID <0 || destID <0) {
+	    return true;    // Just ignore the seed and don't raise an error
+	}
+
+	
+        if (!referrerLinkExists(sourceID, destID)) {
+            try {
+		// create the mysql insert preparedstatement
+		st = connection.prepareStatement(InsertLink);
+		st.setInt    (1, sourceID);
+		st.setInt    (2, destID);
+		st.execute();
+		st.close();
+	    } catch (Exception e) { 
+		System.out.println("ERROR during InformationLink data insert!"); 
+		System.out.println("General Exception: " + e.getMessage());
+                
+                ErrorLog.WriteErrMsg(e, "URL not available! ", sourceID, "StoreReferrerLink (Error) Unable to create a referrer link for:", 
+                        (sourceID + " ---> " + destID));
+                return false;
+	    } // try/catch
+        } // referrerLinkExists
+        
+        return true;// no Error even if linkage already existed
+    } // storeReferrerLink
+
     
     
     /*
+     *   method: referrerLinkExists
+     * modified: 9-November-2017
+     *  purpose: Queries the ReferrerLink table to determine if the source--> destination
+     *           link already exists.
+     *  returns:  true: if link is already stored
+     *           false: if the linkage doe not exist
+     */
+    private boolean referrerLinkExists(int sourceID, int destID) {
+        PreparedStatement st;
+	ResultSet rs;
+	boolean isDuplicate = false;
+	String query = "SELECT COUNT(*) FROM ReferrerTrack where sourceID = ? and destID =?";
+	
+	try {	
+	    st = connection.prepareStatement(query);
+	    st.setInt (1, sourceID);
+            st.setInt (2, destID);
+            rs = st.executeQuery(); 
+	    rs.next();
+	    if (rs.getInt(1) >= 1)
+		isDuplicate = true;
+	    st.close();
+	} catch (Exception ignore) { 
+	    //System.out.println("referrerLinkExists: Error, Search failed for existing InformationLink"); 
+	    //ErrorLog.WriteErrMsg(e, " ", 0, "referrerLinkExists: (Error) Search failed for existing InformationLink", " ");
+	}
+
+	return isDuplicate;
+    } // referrerLinkExists
+
+    
+    /*
      *   method: getNewLinkID
-     * modified: 7-July-2016
+     * modified: 9-November-2017
      *  purpose: returns the next available ID number for a new data link 
      *           and updates the TrackLinkID table.
      */
     private int getNewLinkID() {
 	int LinkID = 0, UpdateLinkID;
-        
+	Statement st;
+	String startTransaction = "START TRANSACTION";
 	String query = "SELECT linkID FROM TrackLinkID";  
 	String update = "update TrackLinkID set linkID = ? where linkID = ?";
- 
+	String commitTransaction = "COMMIT";
+	
 	try {
-	    Statement st = this.connection.createStatement(); // create the java statement
+	    st = this.connection.createStatement();
+	    st.executeQuery(startTransaction);
+	    st.close();
+	    
+	    st = this.connection.createStatement(); // create the java statement
 	    ResultSet rsa = st.executeQuery(query); // execute the query, and get a java resultset
 	    rsa.next();
 	    LinkID = rsa.getInt(1);
 	    st.close();
-
+	    
 	    // Now update the serial number
 	    PreparedStatement prepStmt = this.connection.prepareStatement(update);
 	    UpdateLinkID = LinkID + 1;
@@ -908,11 +1075,18 @@ public class CLT_Spider  {
 	    prepStmt.setInt(2, LinkID);
 	    prepStmt.executeUpdate();
 	    prepStmt.close();
-	} catch (Exception e) { 
+
+	    st = this.connection.createStatement();        
+	    st.executeQuery(commitTransaction);
+	    st.close();
+        } catch (Exception e) { 
 	    System.out.println("ERROR during URL SerialNumber query and update!"); 
 	    System.out.println("General Exception: " + e.getMessage());
+            
+            ErrorLog.WriteErrMsg(e, "URL not available! ", 0, 
+                    "getNewLinkID (Error) Unable to create new linkID!", " ");
 	} 
-	
+
 	return LinkID;
     } // getNewLinkID
 
@@ -933,7 +1107,7 @@ public class CLT_Spider  {
     
     /*
      *  method: readRobotsFile
-     * modified: 17-October-2017
+     * modified: 16-November-2017
      *  returns: (int) number of dis-allowed items in the off-limits (Verboten) list
      *
      * Note: A typical robots.txt file looks much like the following
@@ -1026,14 +1200,22 @@ public class CLT_Spider  {
 	} catch (MalformedURLException e) {
 	    System.out.println("Malformed URL Exception: "+rootURL);
 	    System.out.println("Error: " + e.getMessage());
+            
+            ErrorLog.WriteErrMsg(e, rootURL, 0, "readRobotsFile (WARNING): Malformed URL Exception", " ");
 	} catch (IOException e) {
 	    System.out.println("IO Exception: "+rootURL); // Indicates a missing robots.txt file
 	    System.out.println("Error: " + e.getMessage());
+            
+            ErrorLog.WriteErrMsg(e, rootURL, 0, "readRobotsFile (WARNING): Unable to access robots.txt file.",
+                    "--> Likely cause is a missing robots.txt file on the server.");
 	    return 0; // no items in the dis-allow list
 	} catch (Exception e) {
 	    System.out.println("Error: Possible syntax error in robots.txt file at line:");
 	    print("{%s} caused a general exception error:", line);
 	    System.out.println(e.getMessage());
+            
+            ErrorLog.WriteErrMsg(e, rootURL, 0, "readRobotsFile (WARNING): Syntax error in robots.txt file on line:.",
+                    line);
 	}
 
 	return disallowCount;
@@ -1196,7 +1378,7 @@ public class CLT_Spider  {
     
     /*
      *   method: InitializeKeywordsExcludes
-     * modified: 18-January-2016
+     * modified: 3-November-2017
      *  purpose: Loads the lists of exclusion keywords and site names from the
      *           mySQL database.
      */
@@ -1262,6 +1444,9 @@ public class CLT_Spider  {
         } catch (Exception e) {
 	     System.out.println("loadExcluded: Error loading exlusion keywords and site names");
              System.out.println(e.getMessage());
+             
+             ErrorLog.WriteErrMsg(e, " ", 0, "loadExcluded (ERROR): Unable to load exclusion keywords and/or site names!", " ");
+             
 	} // try/catch block
     
     } // loadExcluded
@@ -1303,7 +1488,7 @@ public class CLT_Spider  {
 
     /*
      *    method: isDuplicateLink
-     *  modified: 26-July-2017
+     *  modified: 3-November-2017
      *   purpose: Determines if links already exist in the CLT_KB.
      * arguments: (String) url to be queried to test for duplication in CLT_KB
      *   returns: true if link is already in the database
@@ -1323,9 +1508,9 @@ public class CLT_Spider  {
 	    if (rs.getInt(1) >= 1)
 		isDuplicate = true;
 	    st.close();
-	} catch (Exception e) { 
-	    System.out.println("isDuplicateLink: Error, Search failed for existing InformationLink"); 
-	    System.out.println("General Exception: " + e.getMessage());
+	} catch (Exception ignore) { 
+	    //System.out.println("isDuplicateLink: Error, Search failed for existing InformationLink"); 
+	    //ErrorLog.WriteErrMsg(e, URL, 0, "isDuplicateLink: (Error) Search failed for existing InformationLink", " ");
 	}
 
 	return isDuplicate;
@@ -1383,12 +1568,12 @@ public class CLT_Spider  {
     
     /*
      *   method: ResourceDownloader
-     * modified: 19-July-2017
+     * modified: 3-November-2017
      *  purpose:
      *  returns: true upon success
      *           false upon failure/error
      */
-    public static boolean ResourceDownloader(String strURL, String path) 
+    public boolean ResourceDownloader(String strURL, String path) 
     {
     InputStream input = null;
     OutputStream output = null;
@@ -1427,9 +1612,13 @@ public class CLT_Spider  {
         }
     } catch (java.net.SocketTimeoutException e) {
         System.out.println("Connection timeout error: "+e.toString());
+        ErrorLog.WriteErrMsg(e, strURL, 0, "ResourceDownloader (ERROR) Connection timeout while", "attempting to download resource file!");
+        
         return false;
     } catch (Exception e) {
 	System.out.println("Download error: "+e.toString());
+        ErrorLog.WriteErrMsg(e, strURL, 0, "ResourceDownloader (ERROR) Download error encountered while", "attempting to download resource file!");
+        
         return false;
     } finally {
         try {
@@ -1449,21 +1638,24 @@ public class CLT_Spider  {
     
     /*
      *   method: resourceInterceptor
-     * modified: 6-October-2017
+     * modified: 9-November-2017
      *  purpose: Handles web resources when found and determines if they are related
      *           to the manufacturer or specifications of CLT.
      *  returns: false if error condition encoutered
      *           true if interceptor completed without error
      */    
     public boolean resourceInterceptor(String url, int linkID, int level, int referrerID) {
-        java.sql.Date discoverDate=null, exploreDate=null, todaysDate=null;
+        java.sql.Date todaysDate=null;
         PreparedStatement st;
         ResultSet rs;
-        FindKeywords finder; 
+        FindKeywords finder;
+        int storedLinkID;
         int i, matchKeywordCount;
         int [] matchingKeywordID;
         
-        
+        Calendar calendar = Calendar.getInstance();
+        todaysDate = new java.sql.Date(calendar.getTime().getTime());
+	
         if (linkID == -1) {            
             if (isDuplicateLink(url)) {
                 /*
@@ -1500,12 +1692,19 @@ public class CLT_Spider  {
 	    if (matchKeywordCount > 0) {
 		System.out.println("Resource keyword matches: "+matchKeywordCount);
                 
-		storeInformationLink(url, fileTitle, " ", filePath,
-				     todaysDate, todaysDate,
-				     matchKeywordCount, STATUS_EXPLORED_A, level, linkID, referrerID);
+		storedLinkID = storeInformationLink(url, fileTitle, " ", filePath,todaysDate, todaysDate,
+				     matchKeywordCount, STATUS_EXPLORED_A, level, linkID);
 		
-		matchingKeywordID = finder.getMatching();
-		storeKeywords(matchingKeywordID, matchKeywordCount, linkID);
+                if (storedLinkID <= 0) { // error codes are 0 and -1
+                    ErrorLog.WriteErrMsg(null,url,linkID,
+                            "ResourceInterceptor (Error): Error code "+storedLinkID+" returned by",
+                            "StoreInformationLink when storing link to resource with keywords");
+                    return false;
+                } else {
+                   storeReferrerLink(referrerID, storedLinkID);
+                   matchingKeywordID = finder.getMatching();
+		   storeKeywords(matchingKeywordID, matchKeywordCount, linkID);
+                }
 	    } else {
 		// no keywords found!
 		// Delete the downloaded resource and store this information
@@ -1521,10 +1720,20 @@ public class CLT_Spider  {
 		    
 		} catch(Exception e){
 		    e.printStackTrace();
+                    ErrorLog.WriteErrMsg(e, url, 0, "ResourceInterceptor (ERROR) Unable to delete temporary storage file at path:", filePath);
 		} // try/catch block
                 
-		storeInformationLink(url, fileTitle, " ", " ", todaysDate, todaysDate,
-				     0, STATUS_EXPLORED_F, level, linkID, referrerID);
+		storedLinkID = storeInformationLink(url, fileTitle, " ", " ", todaysDate, todaysDate,
+				     0, STATUS_EXPLORED_F, level, linkID);
+                
+                if (storedLinkID <= 0) { // error codes are 0 and -1
+                    ErrorLog.WriteErrMsg(null,url,linkID,
+                            "ResourceInterceptor (Error): Error code "+storedLinkID+" returned by",
+                            "StoreInformationLink when storing link to resource with no keywords.");
+                    return false;
+                } else {
+                   storeReferrerLink(referrerID, storedLinkID);
+                }
 	    } // matchKeywordCount
 	} else {
 	    System.out.println("Download Failed!: Updating Link Status to Error Condition");
@@ -1540,11 +1749,20 @@ public class CLT_Spider  {
 	    } catch (Exception e) { 
 		System.out.println("ERROR during URL Download Status change!"); 
 		System.out.println("General Exception: " + e.getMessage());
-	    }
+                
+                ErrorLog.WriteErrMsg(e, url, 0, "ResourceInterceptor (ERROR) General exception encountered during download", 
+                         "file status change update in mysql statement.");
+                return false;
+	    } // try / catch
 	    
 	}
 	
 	return true; // No Error condition
     } // ResourceInterceptor
+    
+    private void StartErrorLog() {
+	ErrorLog = new CrawlerErrorLogger();
+    }
+    
     
 } // WoodSpider Class
